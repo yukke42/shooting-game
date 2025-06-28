@@ -14,6 +14,7 @@ export class Game {
   private scoreManager: ScoreManager;
   
   private gameState: GameState = GameState.TITLE;
+  private previousGameState: GameState = GameState.TITLE;
   private config: GameConfig = {
     difficulty: Difficulty.NORMAL,
     selectedShip: ShipType.BALANCED
@@ -22,6 +23,7 @@ export class Game {
   private selectedMenuIndex = 0;
   private gameTime = 30000;
   private gameStartTime = 0;
+  private damageFlashTime = 0;
   
   private player: Player | null = null;
   private enemyManager: EnemyManager | null = null;
@@ -57,6 +59,7 @@ export class Game {
     this.inputManager.onKeyPress('e', () => this.selectDifficulty(Difficulty.EASY));
     this.inputManager.onKeyPress('n', () => this.selectDifficulty(Difficulty.NORMAL));
     this.inputManager.onKeyPress('h', () => this.selectDifficulty(Difficulty.HARD));
+    this.inputManager.onKeyPress('h', () => this.showHelp());
     this.inputManager.onKeyPress('H', () => this.showHelp());
     this.inputManager.onKeyPress('Escape', () => this.handleEscapeKey());
   }
@@ -77,7 +80,7 @@ export class Game {
         this.startGame();
         break;
       case GameState.HELP:
-        this.gameState = GameState.TITLE;
+        this.gameState = this.previousGameState;
         break;
       case GameState.GAME_OVER:
         this.resetGame();
@@ -107,13 +110,14 @@ export class Game {
   }
 
   private showHelp(): void {
+    this.previousGameState = this.gameState;
     this.gameState = GameState.HELP;
   }
 
   private handleEscapeKey(): void {
     switch (this.gameState) {
       case GameState.HELP:
-        this.gameState = GameState.TITLE;
+        this.gameState = this.previousGameState;
         break;
       case GameState.PLAYING:
         this.gameState = GameState.PAUSED;
@@ -165,26 +169,15 @@ export class Game {
   }
 
   private updateTimeDisplay(): void {
-    const timeElement = document.getElementById('timeDisplay');
-    if (timeElement) {
-      const remainingTime = Math.max(0, this.gameTime - (Date.now() - this.gameStartTime));
-      const seconds = Math.ceil(remainingTime / 1000);
-      timeElement.textContent = `Time: ${seconds}s`;
-    }
+    // UI is now rendered in Canvas
   }
 
   private updateScoreDisplay(): void {
-    const scoreElement = document.getElementById('scoreDisplay');
-    if (scoreElement) {
-      scoreElement.textContent = `Score: ${this.score}`;
-    }
+    // UI is now rendered in Canvas
   }
 
   private updateLivesDisplay(): void {
-    const livesElement = document.getElementById('livesDisplay');
-    if (livesElement) {
-      livesElement.textContent = `Lives: ${this.lives}`;
-    }
+    // UI is now rendered in Canvas
   }
 
   public update(deltaTime: number): void {
@@ -224,6 +217,10 @@ export class Game {
         this.gameOver();
       }
     }
+    
+    if (this.damageFlashTime > 0) {
+      this.damageFlashTime -= deltaTime;
+    }
   }
 
   private checkCollisions(): void {
@@ -262,6 +259,9 @@ export class Game {
           this.lives--;
           this.updateLivesDisplay();
           this.player.health = this.player.maxHealth;
+          this.damageFlashTime = 1000;
+        } else {
+          this.damageFlashTime = 300;
         }
       }
     }
@@ -271,6 +271,7 @@ export class Game {
         enemy.active = false;
         this.lives--;
         this.updateLivesDisplay();
+        this.damageFlashTime = 1000;
       }
     }
   }
@@ -332,7 +333,7 @@ export class Game {
     this.renderer.renderBackground(this.background);
     
     if (this.player) {
-      this.renderer.renderPlayer(this.player);
+      this.renderer.renderPlayer(this.player, this.damageFlashTime > 0);
     }
     
     if (this.enemyManager) {
@@ -349,6 +350,10 @@ export class Game {
         this.renderer.renderEnemyBullet(bullet);
       }
     }
+    
+    const currentTime = Date.now();
+    const remainingTime = Math.max(0, this.gameTime - (currentTime - this.gameStartTime));
+    this.renderer.renderGameUI(this.score, this.lives, remainingTime);
   }
 
   public start(): void {

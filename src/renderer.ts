@@ -30,6 +30,29 @@ export class Renderer {
     background.render(this.ctx);
   }
 
+  public renderGameUI(score: number, lives: number, timeRemaining: number): void {
+    this.ctx.save();
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    this.ctx.fillRect(10, 10, 180, 120);
+    
+    this.ctx.strokeStyle = '#fff';
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(10, 10, 180, 120);
+    
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = 'bold 20px Courier New';
+    this.ctx.textAlign = 'left';
+    
+    this.ctx.fillText(`Score: ${score}`, 20, 35);
+    this.ctx.fillText(`Lives: ${lives}`, 20, 65);
+    
+    const seconds = Math.ceil(timeRemaining / 1000);
+    this.ctx.fillStyle = seconds <= 10 ? '#ff0000' : '#fff';
+    this.ctx.fillText(`Time: ${seconds}s`, 20, 95);
+    
+    this.ctx.restore();
+  }
+
   public renderTitleScreen(): void {
     this.ctx.fillStyle = '#fff';
     this.ctx.font = '48px Courier New';
@@ -40,7 +63,7 @@ export class Renderer {
     this.ctx.fillText('Press ENTER to Start', this.width / 2, this.height / 2 + 50);
     
     this.ctx.font = '18px Courier New';
-    this.ctx.fillText('Press H for Help', this.width / 2, this.height / 2 + 100);
+    this.ctx.fillText('Press h for Help', this.width / 2, this.height / 2 + 100);
     
     this.ctx.font = '16px Courier New';
     this.ctx.fillText('Controls: Arrow Keys to Move, Space to Shoot', this.width / 2, this.height / 2 + 140);
@@ -130,7 +153,7 @@ export class Renderer {
       'CONTROLS:',
       '  • Arrow Keys: Move your ship',
       '  • Space: Shoot bullets',
-      '  • H: Show this help screen',
+      '  • h: Show this help screen',
       '  • ESC: Pause game / Return to menu',
       '',
       'SHIP TYPES:',
@@ -159,12 +182,19 @@ export class Renderer {
     });
     
     this.ctx.fillStyle = '#fff';
-    this.ctx.font = '20px Courier New';
+    this.ctx.font = '18px Courier New';
     this.ctx.textAlign = 'center';
-    this.ctx.fillText('Press ESC or ENTER to return', this.width / 2, this.height - 30);
+    this.ctx.fillText('Press ESC or ENTER to return', this.width / 2, this.height - 20);
   }
 
-  public renderPlayer(player: PlayerShip): void {
+  public renderPlayer(player: PlayerShip, isDamaged = false): void {
+    this.ctx.save();
+    
+    if (isDamaged) {
+      this.ctx.globalAlpha = Math.sin(Date.now() / 50) * 0.5 + 0.5;
+      this.ctx.filter = 'hue-rotate(0deg) saturate(200%) brightness(150%)';
+    }
+    
     const shipTypeKey = player.type === ShipType.SPEED ? 'speed' : 
                        player.type === ShipType.DEFENSE ? 'defense' : 'balanced';
     const imageKey = `player-${shipTypeKey}-${player.width}-${player.height}`;
@@ -177,6 +207,8 @@ export class Renderer {
       player.position.x - player.width / 2, 
       player.position.y - player.height / 2
     );
+    
+    this.ctx.restore();
     
     if (player.health < player.maxHealth) {
       this.renderHealthBar(player.position.x, player.position.y - player.height / 2 - 15, 
