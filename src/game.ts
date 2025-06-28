@@ -19,6 +19,10 @@ export class Game {
     selectedShip: ShipType.BALANCED
   };
   
+  private selectedMenuIndex = 0;
+  private gameTime = 30000;
+  private gameStartTime = 0;
+  
   private player: Player | null = null;
   private enemyManager: EnemyManager | null = null;
   private bulletManager: BulletManager | null = null;
@@ -45,28 +49,77 @@ export class Game {
 
   private setupEventListeners(): void {
     this.inputManager.onKeyPress('Enter', () => this.handleEnterKey());
+    this.inputManager.onKeyPress('ArrowUp', () => this.handleMenuNavigation(-1));
+    this.inputManager.onKeyPress('ArrowDown', () => this.handleMenuNavigation(1));
     this.inputManager.onKeyPress('1', () => this.selectShip(ShipType.SPEED));
     this.inputManager.onKeyPress('2', () => this.selectShip(ShipType.DEFENSE));
     this.inputManager.onKeyPress('3', () => this.selectShip(ShipType.BALANCED));
     this.inputManager.onKeyPress('e', () => this.selectDifficulty(Difficulty.EASY));
     this.inputManager.onKeyPress('n', () => this.selectDifficulty(Difficulty.NORMAL));
     this.inputManager.onKeyPress('h', () => this.selectDifficulty(Difficulty.HARD));
-    this.inputManager.onKeyPress('Escape', () => this.togglePause());
+    this.inputManager.onKeyPress('H', () => this.showHelp());
+    this.inputManager.onKeyPress('Escape', () => this.handleEscapeKey());
   }
 
   private handleEnterKey(): void {
     switch (this.gameState) {
       case GameState.TITLE:
         this.gameState = GameState.SHIP_SELECT;
+        this.selectedMenuIndex = 0;
         break;
       case GameState.SHIP_SELECT:
+        this.selectShipByIndex(this.selectedMenuIndex);
         this.gameState = GameState.DIFFICULTY_SELECT;
+        this.selectedMenuIndex = 0;
         break;
       case GameState.DIFFICULTY_SELECT:
+        this.selectDifficultyByIndex(this.selectedMenuIndex);
         this.startGame();
+        break;
+      case GameState.HELP:
+        this.gameState = GameState.TITLE;
         break;
       case GameState.GAME_OVER:
         this.resetGame();
+        break;
+    }
+  }
+
+  private handleMenuNavigation(direction: number): void {
+    switch (this.gameState) {
+      case GameState.SHIP_SELECT:
+        this.selectedMenuIndex = Math.max(0, Math.min(2, this.selectedMenuIndex + direction));
+        break;
+      case GameState.DIFFICULTY_SELECT:
+        this.selectedMenuIndex = Math.max(0, Math.min(2, this.selectedMenuIndex + direction));
+        break;
+    }
+  }
+
+  private selectShipByIndex(index: number): void {
+    const ships = [ShipType.SPEED, ShipType.DEFENSE, ShipType.BALANCED];
+    this.config.selectedShip = ships[index];
+  }
+
+  private selectDifficultyByIndex(index: number): void {
+    const difficulties = [Difficulty.EASY, Difficulty.NORMAL, Difficulty.HARD];
+    this.config.difficulty = difficulties[index];
+  }
+
+  private showHelp(): void {
+    this.gameState = GameState.HELP;
+  }
+
+  private handleEscapeKey(): void {
+    switch (this.gameState) {
+      case GameState.HELP:
+        this.gameState = GameState.TITLE;
+        break;
+      case GameState.PLAYING:
+        this.gameState = GameState.PAUSED;
+        break;
+      case GameState.PAUSED:
+        this.gameState = GameState.PLAYING;
         break;
     }
   }
@@ -89,6 +142,7 @@ export class Game {
     this.gameState = GameState.PLAYING;
     this.score = 0;
     this.lives = 3;
+    this.gameStartTime = Date.now();
     
     this.player = new Player(this.config.selectedShip, {
       x: this.canvas.width / 2,
@@ -100,6 +154,7 @@ export class Game {
     
     this.updateScoreDisplay();
     this.updateLivesDisplay();
+    this.updateTimeDisplay();
   }
 
   private resetGame(): void {
@@ -109,11 +164,12 @@ export class Game {
     this.bulletManager = null;
   }
 
-  private togglePause(): void {
-    if (this.gameState === GameState.PLAYING) {
-      this.gameState = GameState.PAUSED;
-    } else if (this.gameState === GameState.PAUSED) {
-      this.gameState = GameState.PLAYING;
+  private updateTimeDisplay(): void {
+    const timeElement = document.getElementById('timeDisplay');
+    if (timeElement) {
+      const remainingTime = Math.max(0, this.gameTime - (Date.now() - this.gameStartTime));
+      const seconds = Math.ceil(remainingTime / 1000);
+      timeElement.textContent = `Time: ${seconds}s`;
     }
   }
 
@@ -154,6 +210,15 @@ export class Game {
       this.bulletManager.update(deltaTime);
       
       this.checkCollisions();
+      
+      const currentTime = Date.now();
+      const remainingTime = this.gameTime - (currentTime - this.gameStartTime);
+      
+      if (remainingTime <= 0) {
+        this.gameOver();
+      } else {
+        this.updateTimeDisplay();
+      }
       
       if (this.lives <= 0) {
         this.gameOver();
@@ -212,10 +277,15 @@ export class Game {
 
   private isColliding(obj1: { position: Vector2; width: number; height: number }, 
                      obj2: { position: Vector2; width: number; height: number }): boolean {
-    return obj1.position.x < obj2.position.x + obj2.width &&
-           obj1.position.x + obj1.width > obj2.position.x &&
-           obj1.position.y < obj2.position.y + obj2.height &&
-           obj1.position.y + obj1.height > obj2.position.y;
+    const x1 = obj1.position.x - obj1.width / 2;
+    const y1 = obj1.position.y - obj1.height / 2;
+    const x2 = obj2.position.x - obj2.width / 2;
+    const y2 = obj2.position.y - obj2.height / 2;
+    
+    return x1 < x2 + obj2.width &&
+           x1 + obj1.width > x2 &&
+           y1 < y2 + obj2.height &&
+           y1 + obj1.height > y2;
   }
 
   private gameOver(): void {
@@ -236,10 +306,13 @@ export class Game {
         this.renderer.renderTitleScreen();
         break;
       case GameState.SHIP_SELECT:
-        this.renderer.renderShipSelectScreen(this.config.selectedShip);
+        this.renderer.renderShipSelectScreen(this.config.selectedShip, this.selectedMenuIndex);
         break;
       case GameState.DIFFICULTY_SELECT:
-        this.renderer.renderDifficultySelectScreen(this.config.difficulty);
+        this.renderer.renderDifficultySelectScreen(this.config.difficulty, this.selectedMenuIndex);
+        break;
+      case GameState.HELP:
+        this.renderer.renderHelpScreen();
         break;
       case GameState.PLAYING:
       case GameState.PAUSED:

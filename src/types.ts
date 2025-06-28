@@ -59,6 +59,7 @@ export enum GameState {
   TITLE = 'title',
   SHIP_SELECT = 'ship_select',
   DIFFICULTY_SELECT = 'difficulty_select',
+  HELP = 'help',
   PLAYING = 'playing',
   PAUSED = 'paused',
   GAME_OVER = 'game_over'

@@ -1,15 +1,24 @@
 import { PlayerShip, Enemy, Bullet, ShipType, Difficulty, Score } from './types';
 import { Background } from './entities/background';
+import { ShipImageGenerator } from './assets/shipImages';
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private width: number;
   private height: number;
+  private imageCache: Map<string, ImageData> = new Map();
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
     this.width = ctx.canvas.width;
     this.height = ctx.canvas.height;
+  }
+
+  private getOrCreateImage(key: string, generator: () => ImageData): ImageData {
+    if (!this.imageCache.has(key)) {
+      this.imageCache.set(key, generator());
+    }
+    return this.imageCache.get(key)!;
   }
 
   public clear(): void {
@@ -30,11 +39,14 @@ export class Renderer {
     this.ctx.font = '24px Courier New';
     this.ctx.fillText('Press ENTER to Start', this.width / 2, this.height / 2 + 50);
     
+    this.ctx.font = '18px Courier New';
+    this.ctx.fillText('Press H for Help', this.width / 2, this.height / 2 + 100);
+    
     this.ctx.font = '16px Courier New';
-    this.ctx.fillText('Controls: Arrow Keys to Move, Space to Shoot', this.width / 2, this.height / 2 + 100);
+    this.ctx.fillText('Controls: Arrow Keys to Move, Space to Shoot', this.width / 2, this.height / 2 + 140);
   }
 
-  public renderShipSelectScreen(selectedShip: ShipType): void {
+  public renderShipSelectScreen(_selectedShip: ShipType, selectedIndex: number): void {
     this.ctx.fillStyle = '#fff';
     this.ctx.font = '36px Courier New';
     this.ctx.textAlign = 'center';
@@ -50,10 +62,14 @@ export class Renderer {
     
     ships.forEach((ship, index) => {
       const y = 200 + index * 80;
-      const isSelected = ship.type === selectedShip;
+      const isSelected = index === selectedIndex;
       
       this.ctx.fillStyle = isSelected ? '#ff0' : '#fff';
       this.ctx.fillText(`[${ship.key}] ${ship.name}`, this.width / 2, y);
+      
+      if (isSelected) {
+        this.ctx.fillText('▶', this.width / 2 - 150, y);
+      }
       
       this.ctx.font = '16px Courier New';
       this.ctx.fillStyle = '#aaa';
@@ -63,10 +79,10 @@ export class Renderer {
     
     this.ctx.fillStyle = '#fff';
     this.ctx.font = '16px Courier New';
-    this.ctx.fillText('Press number key to select, ENTER to continue', this.width / 2, this.height - 50);
+    this.ctx.fillText('Use ↑↓ keys or number keys to select, ENTER to continue', this.width / 2, this.height - 50);
   }
 
-  public renderDifficultySelectScreen(selectedDifficulty: Difficulty): void {
+  public renderDifficultySelectScreen(_selectedDifficulty: Difficulty, selectedIndex: number): void {
     this.ctx.fillStyle = '#fff';
     this.ctx.font = '36px Courier New';
     this.ctx.textAlign = 'center';
@@ -82,24 +98,85 @@ export class Renderer {
     
     difficulties.forEach((diff, index) => {
       const y = 250 + index * 60;
-      const isSelected = diff.type === selectedDifficulty;
+      const isSelected = index === selectedIndex;
       
       this.ctx.fillStyle = isSelected ? '#ff0' : '#fff';
       this.ctx.fillText(`[${diff.key}] ${diff.name}`, this.width / 2, y);
+      
+      if (isSelected) {
+        this.ctx.fillText('▶', this.width / 2 - 100, y);
+      }
     });
     
     this.ctx.fillStyle = '#fff';
     this.ctx.font = '16px Courier New';
-    this.ctx.fillText('Press letter key to select, ENTER to start', this.width / 2, this.height - 50);
+    this.ctx.fillText('Use ↑↓ keys or letter keys to select, ENTER to start', this.width / 2, this.height - 50);
+  }
+
+  public renderHelpScreen(): void {
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = '36px Courier New';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText('HELP - GAME RULES', this.width / 2, 80);
+    
+    this.ctx.font = '20px Courier New';
+    this.ctx.textAlign = 'left';
+    
+    const helpText = [
+      'OBJECTIVE:',
+      '  • Survive for 30 seconds and get the highest score',
+      '  • Destroy enemies to earn points',
+      '',
+      'CONTROLS:',
+      '  • Arrow Keys: Move your ship',
+      '  • Space: Shoot bullets',
+      '  • H: Show this help screen',
+      '  • ESC: Pause game / Return to menu',
+      '',
+      'SHIP TYPES:',
+      '  • Speed: Fast movement, low defense',
+      '  • Defense: High defense, slow movement',
+      '  • Balanced: Average stats',
+      '',
+      'ENEMY TYPES:',
+      '  • Normal (red): Basic enemy - 100 points',
+      '  • Large (big red): Stronger enemy - 300 points',
+      '  • Boss (huge red): Powerful enemy - 1000 points'
+    ];
+    
+    helpText.forEach((line, index) => {
+      const y = 140 + index * 25;
+      if (line.startsWith('  ')) {
+        this.ctx.font = '16px Courier New';
+        this.ctx.fillStyle = '#ccc';
+      } else if (line === '') {
+        return;
+      } else {
+        this.ctx.font = '18px Courier New';
+        this.ctx.fillStyle = '#ff0';
+      }
+      this.ctx.fillText(line, 50, y);
+    });
+    
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = '20px Courier New';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText('Press ESC or ENTER to return', this.width / 2, this.height - 30);
   }
 
   public renderPlayer(player: PlayerShip): void {
-    this.ctx.fillStyle = this.getShipColor(player.type);
-    this.ctx.fillRect(player.position.x - player.width / 2, player.position.y - player.height / 2, 
-                      player.width, player.height);
+    const shipTypeKey = player.type === ShipType.SPEED ? 'speed' : 
+                       player.type === ShipType.DEFENSE ? 'defense' : 'balanced';
+    const imageKey = `player-${shipTypeKey}-${player.width}-${player.height}`;
     
-    this.ctx.fillStyle = '#fff';
-    this.ctx.fillRect(player.position.x - 2, player.position.y - player.height / 2 - 5, 4, 8);
+    const imageData = this.getOrCreateImage(imageKey, () => 
+      ShipImageGenerator.generatePlayerShip(shipTypeKey as any, player.width, player.height)
+    );
+    
+    this.ctx.putImageData(imageData, 
+      player.position.x - player.width / 2, 
+      player.position.y - player.height / 2
+    );
     
     if (player.health < player.maxHealth) {
       this.renderHealthBar(player.position.x, player.position.y - player.height / 2 - 15, 
@@ -107,19 +184,20 @@ export class Renderer {
     }
   }
 
-  private getShipColor(shipType: ShipType): string {
-    switch (shipType) {
-      case ShipType.SPEED: return '#0f0';
-      case ShipType.DEFENSE: return '#00f';
-      case ShipType.BALANCED: return '#fff';
-      default: return '#fff';
-    }
-  }
 
   public renderEnemy(enemy: Enemy): void {
-    this.ctx.fillStyle = '#f00';
-    this.ctx.fillRect(enemy.position.x - enemy.width / 2, enemy.position.y - enemy.height / 2,
-                      enemy.width, enemy.height);
+    const enemyTypeKey = enemy.type === 'normal' ? 'normal' : 
+                        enemy.type === 'large' ? 'large' : 'boss';
+    const imageKey = `enemy-${enemyTypeKey}-${enemy.width}-${enemy.height}`;
+    
+    const imageData = this.getOrCreateImage(imageKey, () => 
+      ShipImageGenerator.generateEnemyShip(enemyTypeKey as any, enemy.width, enemy.height)
+    );
+    
+    this.ctx.putImageData(imageData, 
+      enemy.position.x - enemy.width / 2, 
+      enemy.position.y - enemy.height / 2
+    );
     
     if (enemy.health < enemy.maxHealth) {
       this.renderHealthBar(enemy.position.x, enemy.position.y - enemy.height / 2 - 10,
@@ -136,15 +214,29 @@ export class Renderer {
   }
 
   public renderPlayerBullet(bullet: Bullet): void {
-    this.ctx.fillStyle = '#0ff';
-    this.ctx.fillRect(bullet.position.x - bullet.width / 2, bullet.position.y - bullet.height / 2,
-                      bullet.width, bullet.height);
+    const imageKey = `bullet-player-${bullet.width}-${bullet.height}`;
+    
+    const imageData = this.getOrCreateImage(imageKey, () => 
+      ShipImageGenerator.generateBulletImage('player', bullet.width, bullet.height)
+    );
+    
+    this.ctx.putImageData(imageData, 
+      bullet.position.x - bullet.width / 2, 
+      bullet.position.y - bullet.height / 2
+    );
   }
 
   public renderEnemyBullet(bullet: Bullet): void {
-    this.ctx.fillStyle = '#f80';
-    this.ctx.fillRect(bullet.position.x - bullet.width / 2, bullet.position.y - bullet.height / 2,
-                      bullet.width, bullet.height);
+    const imageKey = `bullet-enemy-${bullet.width}-${bullet.height}`;
+    
+    const imageData = this.getOrCreateImage(imageKey, () => 
+      ShipImageGenerator.generateBulletImage('enemy', bullet.width, bullet.height)
+    );
+    
+    this.ctx.putImageData(imageData, 
+      bullet.position.x - bullet.width / 2, 
+      bullet.position.y - bullet.height / 2
+    );
   }
 
   public renderPauseOverlay(): void {
